@@ -1,0 +1,84 @@
+version: '3.8'
+
+# Development docker-compose configuration
+# Uses volume mounts for hot reloading and development
+
+services:
+  # Ollama LLM Service (same as production)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: cratoss-ollama-dev
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data_dev:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - cratoss-network-dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Backend RAG Service - Development mode with hot reload
+  backend:
+    build:
+      context: ./Cratoss--RAG
+      dockerfile: Dockerfile
+    container_name: cratoss-backend-dev
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount source code for hot reload
+      - ./Cratoss--RAG:/app
+      - backend_cache_dev:/root/.cache
+      # Exclude venv from mount
+      - /app/.venv
+    environment:
+      - PYTHONUNBUFFERED=1
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - RELOAD=true
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - cratoss-network-dev
+
+  # Frontend Service - Development mode with Vite dev server
+  frontend:
+    build:
+      context: ./Cratoss_Frontend
+      dockerfile: Dockerfile.dev
+    container_name: cratoss-frontend-dev
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      # Mount source code for hot reload
+      - ./Cratoss_Frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - cratoss-network-dev
+    stdin_open: true
+    tty: true
+
+networks:
+  cratoss-network-dev:
+    driver: bridge
+    name: cratoss-network-dev
+
+volumes:
+  ollama_data_dev:
+    name: cratoss-ollama-data-dev
+  backend_cache_dev:
+    name: cratoss-backend-cache-dev
