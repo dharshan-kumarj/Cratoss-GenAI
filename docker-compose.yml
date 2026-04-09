@@ -77,6 +77,31 @@ services:
       retries: 3
       start_period: 10s
 
+  # Prometheus for monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: cratoss-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - cratoss-network
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: cratoss-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - cratoss-network
+
 networks:
   cratoss-network:
     driver: bridge
@@ -87,3 +112,5 @@ volumes:
     name: cratoss-ollama-data
   backend_cache:
     name: cratoss-backend-cache
+  prometheus_data:
+  grafana_data:
